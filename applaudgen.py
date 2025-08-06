@@ -9,10 +9,10 @@ def main():
 
     parser = argparse.ArgumentParser(description='Generate Python SDK code for the App Store Connect API.')
     parser.add_argument('-s', '--spec', dest='spec_file',
-                        default=f'{cur_path}/app_store_connect_api.json',
+                        default=os.path.join(cur_path, 'app_store_connect_api.json'),
                         help='Path to the App Store Connect API specification file.')
     parser.add_argument('-o', '--output', dest='output_dir',
-                        default=f'{cur_path}/PythonPackage/applaud/',
+                        default=os.path.join(cur_path, 'PythonPackage/applaud/'),
                         help='Path to the package output directory.')
 
     args = parser.parse_args()

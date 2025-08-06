@@ -17,11 +17,13 @@ def _canonical_type_code(type: str, format: str = None) -> str:
             return 'AnyUrl'
         elif format == 'uri-reference':
             return 'str'
-        elif format == None:
+        elif format == None or format == 'number' or format == 'duration':
             return 'str'
         else:
             assert False, f'Unhandled string format: {format}'
     if type == 'integer':
+        if format and format == 'int64':
+            return 'int'
         assert format == None, f'Unhandled integer format: {format}'
         return 'int'
     if type == 'number':

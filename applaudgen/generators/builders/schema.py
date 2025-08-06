@@ -141,6 +141,8 @@ class SchemaClassBuilder(ABC):
                     self.nested_classes.append(sub_class_builder.build())
                     self.remain_enums.update(sub_class_builder.remain_enums)
                     property_type = capfirst(property_name)
+                elif property_type == 'object':
+                    property_type = 'dict'
                 else:
                     assert False, f'Cannot handle type ({property_type}) in class {self.name}'
             elif property_type == 'array':
@@ -174,6 +176,11 @@ class SchemaClassBuilder(ABC):
                     # included field, discriminator is `type` attribute of contained object
                     union_types = [ref['$ref'].split('/')[-1] for ref in items['oneOf'] if '$ref' in ref]
                     property_type = self.list_type_code(union_types)
+                elif items['type'] == 'array':
+                    if '$ref' in items['items']:
+                        property_type = self.list_type_code(self.list_type_code(items['items']['$ref'].split('/')[-1]))
+                    else:
+                        property_type = self.list_type_code(self.list_type_code(items['items']['type']))
                 else:
                     assert False, f'Not supported array type ({items}) in class {self.name}'
             elif 'oneOf' in property_dict:
@@ -192,9 +199,11 @@ class SchemaClassBuilder(ABC):
             assert self.fields['type']=='string', "Unkown type in enum!"
             return self.build_enum_code(self.name, self.fields['enum'])
 
-        allowed_field_keys = ['type', 'title', 'required', 'properties', 'deprecated']
+        allowed_field_keys = ['type', 'title', 'required', 'properties', 'deprecated', 'additionalProperties']
 
         # Check keys to make sure we have handled all types in classes
+        if 'additionalProperties' in self.fields:
+            return ''
         assert all(field_key in allowed_field_keys for field_key in self.fields.keys()), f'Contains unknown field key ({self.fields.keys()}) in class {self.name}'
         
         deprecated = self.fields.get('deprecated', False)

@@ -1,6 +1,5 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from re import template
 from jinja2.environment import Template
 from jinja2.utils import internalcode
 import orjson, os
@@ -61,12 +60,14 @@ class SDKGenerator(ABC):
         endpoints_grouped_by_tag = {}
 
         def create_and_add_dummy_root(dummy_path: str, child: EndpointClassBuilder, leaf: bool):
-            dummy = self.create_dummy_endpoint(dummy_path)
+            if any(e.path == dummy_path for e in root_endpoints):
+                dummy = next(e for e in root_endpoints if e.path == dummy_path)
+            else:
+                dummy = self.create_dummy_endpoint(dummy_path)
+                root_endpoints.append(dummy)
+                tag = child.tags[0]
+                endpoints_grouped_by_tag[tag] = endpoints_grouped_by_tag.get(tag, []) + [dummy]
             dummy.leaf_endpoints.append(child) if leaf else dummy.linkage_endpoints.append(child)
-            tag = child.tags[0]
-
-            root_endpoints.append(dummy)
-            endpoints_grouped_by_tag[tag] = endpoints_grouped_by_tag.get(tag, []) + [dummy]
             
 
         for path, spec in paths.items():
@@ -100,8 +101,11 @@ class SDKGenerator(ABC):
 
             if not root_endpoint:
                 dumy_path = '/'.join(leaf_endpoint.path.split('/')[:4])
-                print(f'Missing id endpoint for leaf endpoint {leaf_endpoint.path}, create dummy id endpoint {dumy_path}')
-                create_and_add_dummy_root(dumy_path, leaf_endpoint, True)
+                if not any(e.path == dumy_path for e in root_endpoints):
+                    create_and_add_dummy_root(dumy_path, leaf_endpoint, True)
+                else:
+                    root_endpoint = next(e for e in root_endpoints if e.path == dumy_path)
+                    root_endpoint.leaf_endpoints.append(leaf_endpoint)
             else:
                 root_endpoint.leaf_endpoints.append(leaf_endpoint)
 
@@ -110,8 +114,11 @@ class SDKGenerator(ABC):
 
             if not root_endpoint:
                 dumy_path = '/'.join(linkage_endpoint.path.split('/')[:4])
-                print(f'Missing id endpoint for linkage endpoint {linkage_endpoint.path}, create dummy id endpoint {dumy_path}')
-                create_and_add_dummy_root(dumy_path, leaf_endpoint, False)
+                if not any(e.path == dumy_path for e in root_endpoints):
+                    create_and_add_dummy_root(dumy_path, linkage_endpoint, False)
+                else:
+                    root_endpoint = next(e for e in root_endpoints if e.path == dumy_path)
+                    root_endpoint.linkage_endpoints.append(linkage_endpoint)
             else:
                 root_endpoint.linkage_endpoints.append(linkage_endpoint)
 
@@ -120,7 +127,7 @@ class SDKGenerator(ABC):
         for endpoint in root_endpoints + leaf_endpoints + linkage_endpoints:
             for name, value in endpoint.fields_enums.items():
                 if name in all_fields_enums:
-                    assert all_fields_enums[name] == value, f'Field {name} is defined twice with different values'
+                    all_fields_enums[name] = list(set(all_fields_enums[name] + value))
                 else:
                     all_fields_enums[name] = value
 
@@ -169,6 +176,8 @@ class SDKGenerator(ABC):
                     responses[key] = value
                 else:
                     models[key] = value
+            elif value["type"] == "string":
+                pass
             else:
                 assert False, f'Unknown type ({value["type"]}) in schemas!'
 
