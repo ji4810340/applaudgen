@@ -138,10 +138,13 @@ class SchemaClassBuilder(ABC):
                     property_type = self.entitlements_type_code()
                 elif 'properties' in property_dict:
                     sub_class_builder = self.__class__(self.jinja_env, capfirst(property_name), property_dict, self.is_model_class, parent_name)
-                    self.nested_classes.append(sub_class_builder.build())
+                    sub_class_code = sub_class_builder.build()
+                    if sub_class_code is not None:  # Only add if not None
+                        self.nested_classes.append(sub_class_code)
                     self.remain_enums.update(sub_class_builder.remain_enums)
                     property_type = capfirst(property_name)
-                elif property_type == 'object':
+                elif 'additionalProperties' in property_dict:
+                    # Object with additionalProperties but no defined properties - use dict
                     property_type = 'dict'
                 else:
                     assert False, f'Cannot handle type ({property_type}) in class {self.name}'
@@ -152,11 +155,22 @@ class SchemaClassBuilder(ABC):
                 if item_type == 'object':
                     item_type_name = capfirst(simple_singular(property_name))
                     item_class_builder = self.__class__(self.jinja_env, item_type_name, items, self.is_model_class, parent_name)
-                    self.nested_classes.append(item_class_builder.build())
+                    item_class_code = item_class_builder.build()
+                    if item_class_code is not None:
+                        self.nested_classes.append(item_class_code)
                     self.remain_enums.update(item_class_builder.remain_enums)
                     property_type = self.list_type_code(item_type_name)
                 elif item_type == 'string':
                     property_type = self.list_type_code(f"string")
+                elif item_type == 'array':
+                    # Array of arrays - create a nested class for the inner array
+                    item_type_name = capfirst(simple_singular(property_name))
+                    item_class_builder = self.__class__(self.jinja_env, item_type_name, items, self.is_model_class, parent_name)
+                    item_class_code = item_class_builder.build()
+                    if item_class_code is not None:
+                        self.nested_classes.append(item_class_code)
+                    self.remain_enums.update(item_class_builder.remain_enums)
+                    property_type = self.list_type_code(item_type_name)
                 elif '$ref' in items:
                     '''
                     "items" : {
@@ -176,11 +190,6 @@ class SchemaClassBuilder(ABC):
                     # included field, discriminator is `type` attribute of contained object
                     union_types = [ref['$ref'].split('/')[-1] for ref in items['oneOf'] if '$ref' in ref]
                     property_type = self.list_type_code(union_types)
-                elif items['type'] == 'array':
-                    if '$ref' in items['items']:
-                        property_type = self.list_type_code(self.list_type_code(items['items']['$ref'].split('/')[-1]))
-                    else:
-                        property_type = self.list_type_code(self.list_type_code(items['items']['type']))
                 else:
                     assert False, f'Not supported array type ({items}) in class {self.name}'
             elif 'oneOf' in property_dict:
@@ -199,11 +208,20 @@ class SchemaClassBuilder(ABC):
             assert self.fields['type']=='string', "Unkown type in enum!"
             return self.build_enum_code(self.name, self.fields['enum'])
 
-        allowed_field_keys = ['type', 'title', 'required', 'properties', 'deprecated', 'additionalProperties']
+        # If it's just an array type (has type and items but no properties), treat it as a simple type alias
+        if self.fields.get('type') == 'array' and 'items' in self.fields and 'properties' not in self.fields:
+            # This is a type alias for an array, not a class
+            # We'll just skip it and let the parent handle it
+            return None
+        
+        # If it's an object with only additionalProperties (like a map/dict), skip it
+        if self.fields.get('type') == 'object' and 'additionalProperties' in self.fields and 'properties' not in self.fields:
+            # This is a dict/map type, not a class
+            return None
+
+        allowed_field_keys = ['type', 'title', 'required', 'properties', 'deprecated']
 
         # Check keys to make sure we have handled all types in classes
-        if 'additionalProperties' in self.fields:
-            return ''
         assert all(field_key in allowed_field_keys for field_key in self.fields.keys()), f'Contains unknown field key ({self.fields.keys()}) in class {self.name}'
         
         deprecated = self.fields.get('deprecated', False)

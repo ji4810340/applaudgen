@@ -17,14 +17,19 @@ def _canonical_type_code(type: str, format: str = None) -> str:
             return 'AnyUrl'
         elif format == 'uri-reference':
             return 'str'
-        elif format == None or format == 'number' or format == 'duration':
+        elif format == 'number':
+            # Some string fields have number format (like version numbers)
+            return 'str'
+        elif format == 'duration':
+            # ISO 8601 duration format
+            return 'str'
+        elif format == None:
             return 'str'
         else:
             assert False, f'Unhandled string format: {format}'
     if type == 'integer':
-        if format and format == 'int64':
-            return 'int'
-        assert format == None, f'Unhandled integer format: {format}'
+        # int64 is also just int in Python
+        assert format == None or format == 'int64', f'Unhandled integer format: {format}'
         return 'int'
     if type == 'number':
         assert format == None, f'Unhandled number format: {format}'
