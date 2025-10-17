@@ -130,7 +130,7 @@ class SchemaClassBuilder(ABC):
 
                     if len(enum) == 1:
                         # enum is a single value
-                        default_value = f'{property_type}.{enum[0]}'
+                        default_value = f'{property_type}.{safe_enum_name(enum[0])}'
             elif property_type == 'object':
                 if property_name == "place" and not self.is_model_class:
                     property_type = "AppClipAdvancedExperience.Attributes.Place"
@@ -194,8 +194,26 @@ class SchemaClassBuilder(ABC):
                     assert False, f'Not supported array type ({items}) in class {self.name}'
             elif 'oneOf' in property_dict:
                 # ErrroResponse.source, no discriminator
-                union_types = [ref['$ref'].split('/')[-1] for ref in property_dict['oneOf'] if '$ref' in ref]
-                property_type = self.union_type_code(union_types)
+                union_types = []
+                for idx, ref in enumerate(property_dict['oneOf']):
+                    if '$ref' in ref:
+                        union_types.append(ref['$ref'].split('/')[-1])
+                    elif ref.get('type') == 'string':
+                        # Inline string type - just use str
+                        union_types.append('str')
+                    elif ref.get('type') == 'object':
+                        # Inline object type - create a nested class
+                        nested_class_name = capfirst(property_name) + f'Option{idx + 1}'
+                        nested_class_builder = self.__class__(self.jinja_env, nested_class_name, ref, self.is_model_class, parent_name)
+                        nested_class_code = nested_class_builder.build()
+                        if nested_class_code is not None:
+                            self.nested_classes.append(nested_class_code)
+                        self.remain_enums.update(nested_class_builder.remain_enums)
+                        union_types.append(nested_class_name)
+                # Remove duplicates while preserving order
+                seen = set()
+                union_types = [x for x in union_types if not (x in seen or seen.add(x))]
+                property_type = self.union_type_code(union_types) if union_types else 'str'
             else:
                 type_format = property_dict.get('format', None)
                 property_type = self.canonical_type_code(property_type, type_format)

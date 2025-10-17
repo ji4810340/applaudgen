@@ -20,4 +20,18 @@ def simple_singular(value: str):
         return value[:-1]
     else:
         return value
+
+def safe_enum_name(value: str):
+    """Convert a string to a valid Python identifier for enum member names.
+    
+    Replaces dots, hyphens, and other invalid characters with underscores.
+    """
+    # Replace dots and hyphens with underscores
+    safe_name = re.sub(r'[.\-]', '_', value)
+    # Replace any other non-alphanumeric characters (except underscore) with underscore
+    safe_name = re.sub(r'[^a-zA-Z0-9_]', '_', safe_name)
+    # Ensure it doesn't start with a digit
+    if safe_name and safe_name[0].isdigit():
+        safe_name = '_' + safe_name
+    return safe_name
         

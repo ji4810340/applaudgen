@@ -34,6 +34,7 @@ class SDKGenerator(ABC):
         self.jinja_env.filters["capfirst"] = capfirst
         self.jinja_env.filters["snake_case"] = snake_case
         self.jinja_env.filters["simple_singular"] = simple_singular
+        self.jinja_env.filters["safe_enum_name"] = safe_enum_name
         self.jinja_env.add_extension("jinja2.ext.do")
 
     def build_schemas_code(self, definitions: dict, *, super_class: Optional[str] = None, order_keys: list = [], in_models: bool = False) -> tuple[list, dict]:
@@ -121,9 +122,11 @@ class SDKGenerator(ABC):
             for name, value in endpoint.fields_enums.items():
                 if name in all_fields_enums:
                     if all_fields_enums[name] != value:
-                        # Merge the values if they're different
+                        # Merge the values if they're different, preserving order
                         print(f'Warning: Field {name} is defined twice with different values, merging')
-                        all_fields_enums[name] = list(set(all_fields_enums[name] + value))
+                        # Use dict.fromkeys() to remove duplicates while preserving order
+                        merged = list(dict.fromkeys(all_fields_enums[name] + value))
+                        all_fields_enums[name] = merged
                 else:
                     all_fields_enums[name] = value
 

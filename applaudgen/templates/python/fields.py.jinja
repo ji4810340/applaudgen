@@ -4,8 +4,12 @@ from .schemas.enums import StringEnum
 
 {% for name, values in fields_enums.items() %}
 class {{ name|simple_singular|capfirst }}Field(StringEnum):
+    {% if values %}
     {% for value in values %}
     {{ value|snake_case|upper }} = '{{value}}'
     {% endfor %}
+    {% else %}
+    pass
+    {% endif %}
 
 {% endfor %}

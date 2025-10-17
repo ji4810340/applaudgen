@@ -1,4 +1,4 @@
 class {{name}}(StringEnum):
     {% for value in values %}
-    {{value}} = '{{value}}'
+    {{value|safe_enum_name}} = '{{value}}'
     {% endfor %}

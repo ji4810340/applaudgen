@@ -1,6 +1,8 @@
 {% include 'header.jinja' %}
 
-from pydantic import BaseModel, AnyUrl, EmailStr, Field
+from __future__ import annotations
+
+from pydantic import BaseModel, AnyUrl, EmailStr, Field, ConfigDict
 from deprecated import deprecated
 from .enums import *
 from typing import Optional, Literal
@@ -27,10 +29,12 @@ def _camelcase(string):
                     string[1:]))
 
 class ApplaudModel(BaseModel):
-    class Config:
-        alias_generator = _camelcase
-        underscore_attrs_are_private = True
-        allow_population_by_field_name = True
+    model_config = ConfigDict(
+        alias_generator=_camelcase,
+        populate_by_name=True,
+        # 允许额外字段，这样 API 返回的未知字段不会导致验证失败
+        extra='allow',
+    )
 
 {% for schema in schemas %}
 {{ schema }}

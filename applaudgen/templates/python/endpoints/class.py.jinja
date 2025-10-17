@@ -35,7 +35,7 @@ class {{endpoint.class_name}}({% if endpoint.has_id_param %}IDEndpoint{% else %}
         {% for name, values in endpoint.enums.items() %}
     class {{name}}(StringEnum):
             {% for value in values %}
-        {{value}} = '{{value}}'
+        {{value|safe_enum_name}} = '{{value}}'
             {% endfor %}
 
         {% endfor %}
